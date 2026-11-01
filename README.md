@@ -1,7 +1,7 @@
 <h1 align="center">CacheBridge</h1>
 
 <p align="center">
-  <strong>Cross-model KV cache reuse for LLM handoffs</strong>
+  <strong>Efficient Cross-Model KV Transfer for Multi-Model LLM Serving</strong>
 </p>
 
 <p align="center">
@@ -21,40 +21,51 @@
   <a href="docs/agent_development.md">Agent Guide</a>
 </p>
 
-CacheBridge maps a source model's KV cache into a target model's cache space,
-allowing the target to continue from a transferred history when an LLM workflow
-switches models. It combines **offline mapper fitting** with **online cache
-conversion and installation**, and provides interfaces for agent trajectories
-and model routing.
+CacheBridge is a serving system that accelerates heterogeneous multi-model LLM
+workloads through **cross-model KV transfer**. When routers, cascades or agent
+workflows switch models, it reconstructs the target model's history KV from the
+source cache to avoid re-prefilling the shared history. It co-designs a
+**compact, attention-calibrated KV mapper** with an optimized online handoff
+path to reduce latency and memory overhead while preserving task quality.
 
-- **Closed-form fitting.** Head-local affine initialization and sequential
-  value calibration, with explicit source support and mapper artifacts.
-- **Bounded online transfer.** Source-side block conversion, double buffering,
-  GPU peer delivery, direct target-cache installation and all-rank publication.
-- **Composable agent interfaces.** Separate environment, router and backend
-  protocols, exact-token trajectory sampling and an agentic workload adaptor.
+The paper presents four components:
+
+- **Compact head assignment.** Reconstruct each target KV head from one source
+  KV head per selected source layer using affine ridge maps, with head assignment
+  co-designed for source-side reconstruction.
+- **Attention-readout calibration.** Calibrate value maps against the target's
+  attention readouts from re-prefill, keeping key maps and head assignment fixed
+  and folding the corrections into the existing map coefficients.
+- **Systematic optimization.** Pipeline reconstruction, transfer and direct
+  installation into target paged KV storage with double buffering and bounded
+  temporary memory.
+- **Online serving policy.** Select transfer or re-prefill for each request and
+  coordinate transfer concurrency and buffer allocation with serving demand and
+  available GPU memory.
 
 ## How it works
 
-### Offline fitting · Section 4
+### Fitting a Deployable KV Mapper · Section 4
 
 <p align="center">
-  <a href="assets/figures/offline_fitting.pdf"><img src="assets/figures/offline_fitting.png" alt="Paper Section 4: collect native KV traces, select features, fit K/V maps, calibrate V and export the mapper" width="100%"></a>
+  <a href="assets/figures/offline_fitting.pdf"><img src="assets/figures/offline_fitting.png" alt="Paper Section 4: compact head assignment, initial ridge fitting, attention-readout calibration and mapper export" width="100%"></a>
 </p>
 
-### Online system · Section 5
+### CacheBridge System Design · Section 5
 
 <p align="center">
   <a href="assets/figures/online_system.pdf"><img src="assets/figures/online_system.png" alt="Paper Section 5: source-side reconstruction, concurrent pipelined transfer and online serving policy" width="100%"></a>
 </p>
 
-The figures are from the paper's offline fitting and system design sections.
+The figures are from the paper's mapper fitting and system design sections.
 Click either figure to open its original PDF.
 
-Offline code prepares and fits the mapping. Online code applies that mapping
-while preserving source-cache ownership and publishing the target prefix only
-after every block and rank is ready. The model router chooses the next model;
-the cache backend performs the handoff.
+Offline fitting combines compact head assignment and initial ridge fitting with
+layer-ordered attention-readout calibration. Online serving combines source-side
+reconstruction, concurrent pipelined transfer and an online serving policy.
+Source history stays protected during reconstruction, and the target prefix is
+published only after every block and rank is ready. The model router chooses the
+next model, and CacheBridge chooses how to prepare its history state.
 
 See the [pipeline-to-code guide](docs/paper_pipeline.md) for stage boundaries
 and the [architecture guide](docs/architecture.md) for resource lifetimes.
@@ -106,7 +117,7 @@ boundaries; structured-cache helpers use a separate Transformers 5.15 environmen
 ## Offline: fit a mapper
 
 The trajectory recipe consumes native TRAIN handoffs, paired KV snapshots and
-an existing initializer that supplies source-layer support and initial V
+an existing initializer that supplies the selected source layers and initial V
 coefficients. Model weights, initializers and fitted mapper weights are external
 inputs; see the [artifact format](docs/artifacts.md).
 
@@ -129,9 +140,10 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 cachebridge fit run \
 cachebridge verify /path/to/new-fit/candidate.json
 ```
 
-Use `--freeze-keys` during preparation to retain K coefficients while fitting V
-on a new trajectory bank. The [fitting guide](docs/fitting.md) covers native
-sampling, continuation collection, input contracts and the calibration objective.
+Use `--freeze-keys` during preparation to retain K coefficients while calibrating
+value maps on a new trajectory bank. The [fitting guide](docs/fitting.md) covers
+native sampling, continuation collection, input contracts and the calibration
+objective.
 
 ## Online: serve with SGLang
 
@@ -205,8 +217,8 @@ and reward replay. See the [agent development guide](docs/agent_development.md).
 ```text
 src/cachebridge/
 ├── architectures/     # Model adapters and complete model-pair contracts
-├── offline/           # Traces, support, initialization, calibration, export
-├── online/            # Mapping, resource lifetimes and handoff coordination
+├── offline/           # Head assignment, ridge fitting, readout calibration, export
+├── online/            # KV reconstruction, pipelined transfer and handoff coordination
 ├── backends/sglang/   # Engine adapter, runtime and compatibility patch
 ├── agents/            # Router/backend protocols and trajectory sampling
 ├── artifacts.py       # Mapper format and integrity checks
@@ -227,7 +239,7 @@ docs/                 # Design, usage and extension guides
 | :--- | :--- |
 | [Pipeline and code](docs/paper_pipeline.md) | Offline/online stages and their implementations |
 | [Architecture](docs/architecture.md) | Dependency boundaries and resource ownership |
-| [Fitting](docs/fitting.md) | Trace collection, initialization and sequential calibration |
+| [Fitting](docs/fitting.md) | Trace collection, initial ridge fitting and attention-readout calibration |
 | [Serving](docs/serving.md) | CUDA environment, SGLang setup and runtime configuration |
 | [Model adapters](docs/architectures.md) | Family capabilities and cache-state operations |
 | [Trajectory API](docs/agent_trajectories.md) | Agent integration and exact-token records |
@@ -266,7 +278,7 @@ If you use CacheBridge in your research, please cite our paper:
 
 ```bibtex
 @misc{qu2026cachebridge,
-  title         = {{CacheBridge}: Efficient Cross-Model {KV} Cache Transfer},
+  title         = {{CacheBridge}: Efficient Cross-Model {KV} Transfer for Multi-Model {LLM} Serving},
   author        = {Qu, Xingyu and Lu, Siyuan and Chen, Zhiyu and Wang, Sheng and Lin, Tao},
   year          = {2026},
   eprint        = {2609.00891},
