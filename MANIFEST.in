@@ -5,6 +5,7 @@ graft integrations
 graft benchmarks
 graft recipes
 recursive-include docs *.md
+recursive-include assets *.png *.pdf
 recursive-include examples *.py
 recursive-include tests *.py
 global-exclude *.safetensors *.pt *.pth *.ckpt *.bin *.npy *.npz *.py[cod]

@@ -1,4 +1,4 @@
-name: CPU contracts
+name: CPU tests
 
 on: [push, pull_request]
 
@@ -9,6 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     env:

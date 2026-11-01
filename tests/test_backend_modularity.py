@@ -59,6 +59,32 @@ def test_all_runtime_modules_import_without_config_or_engine(monkeypatch):
     assert "sglang" not in sys.modules
 
 
+def test_peer_runtime_import_requires_no_cuda_installation(monkeypatch):
+    # Exercise a genuinely missing CUDA dependency even on development hosts
+    # where a CUDA-enabled torch wheel has already installed NVIDIA packages.
+    monkeypatch.delenv("CACHEBRIDGE_CUDART", raising=False)
+    code = """import importlib.abc
+import sys
+
+class NoNvidia(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "nvidia" or fullname.startswith("nvidia."):
+            raise ModuleNotFoundError("CUDA is absent", name=fullname)
+
+sys.meta_path.insert(0, NoNvidia())
+from cachebridge.backends.sglang.runtime.peer_runtime import PeerRuntime
+assert not any(n == "nvidia" or n.startswith("nvidia.") for n in sys.modules)
+try:
+    PeerRuntime()
+except RuntimeError as error:
+    assert "CUDA runtime is unavailable" in str(error)
+    assert "CACHEBRIDGE_CUDART" in str(error)
+else:
+    raise AssertionError("Creating a GPU peer runtime must require CUDA")
+"""
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
 def test_core_commands_import_without_torch_transformers_or_sglang():
     code = """import sys
 from cachebridge.backends.sglang.config import RuntimeConfig

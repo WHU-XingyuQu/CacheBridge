@@ -14,21 +14,26 @@ def cuda_runtime_library():
         if not path.is_file():
             raise FileNotFoundError(path)
         return path
-    package = importlib.util.find_spec("nvidia.cuda_runtime")
+    try:
+        package = importlib.util.find_spec("nvidia.cuda_runtime")
+    except ModuleNotFoundError as error:
+        if error.name not in {"nvidia", "nvidia.cuda_runtime"}:
+            raise
+        package = None
     if package and package.submodule_search_locations:
         for directory in package.submodule_search_locations:
             path = Path(directory) / "lib/libcudart.so.12"
             if path.is_file():
                 return path
-    raise RuntimeError("Set CACHEBRIDGE_CUDART to the tested CUDA12.6 libcudart.so.12")
-
-
-LIB = cuda_runtime_library()
+    raise RuntimeError(
+        "CUDA runtime is unavailable. Install the NVIDIA CUDA12.6 runtime or set "
+        "CACHEBRIDGE_CUDART to libcudart.so.12 before creating PeerRuntime."
+    )
 
 
 class PeerRuntime:
     def __init__(self):
-        self.lib = ctypes.CDLL(str(LIB))
+        self.lib = ctypes.CDLL(str(cuda_runtime_library()))
         self.fn = self.lib.cudaMemcpyPeerAsync
         self.fn.argtypes = [
             ctypes.c_void_p,

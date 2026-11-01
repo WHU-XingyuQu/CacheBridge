@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml"><img src="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml/badge.svg" alt="CPU contracts"></a>
+  <a href="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml"><img src="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml/badge.svg" alt="CPU tests"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="requirements/fitting.txt"><img src="https://img.shields.io/badge/PyTorch-2.7.1-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch 2.7.1"></a>
 </p>
@@ -34,21 +34,20 @@ and model routing.
 
 ## How it works
 
-```mermaid
-flowchart TB
-    subgraph Offline["Offline · fitting"]
-        T["Paired native KV traces"] --> I["Head-local initialization"]
-        I --> C["Sequential V calibration"]
-        C --> M["Mapper artifact"]
-    end
-    subgraph Online["Online · serving"]
-        S["Resident source KV"] --> B["Block conversion + double buffering"]
-        B --> P["Direct target installation"]
-        P --> R["All-rank publication"]
-        R --> Q["Target continuation"]
-    end
-    M -.-> B
-```
+### Offline fitting · Section 4
+
+<p align="center">
+  <a href="assets/figures/offline_fitting.pdf"><img src="assets/figures/offline_fitting.png" alt="Paper Section 4: collect native KV traces, select features, fit K/V maps, calibrate V and export the mapper" width="100%"></a>
+</p>
+
+### Online system · Section 5
+
+<p align="center">
+  <a href="assets/figures/online_system.pdf"><img src="assets/figures/online_system.png" alt="Paper Section 5: source-side reconstruction, concurrent pipelined transfer and online serving policy" width="100%"></a>
+</p>
+
+The figures are from the paper's offline fitting and system design sections.
+Click either figure to open its original PDF.
 
 Offline code prepares and fits the mapping. Online code applies that mapping
 while preserving source-cache ownership and publishing the target prefix only
