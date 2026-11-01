@@ -259,3 +259,20 @@ and builds on PyTorch, Transformers and safetensors.
 The project license is pending. Third-party components retain their upstream
 licenses; see [license status](LICENSE_STATUS.md) and
 [third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Citation
+
+If you use CacheBridge in your research, please cite our paper:
+
+```bibtex
+@misc{qu2026cachebridge,
+  title         = {{CacheBridge}: Efficient Cross-Model {KV} Cache Transfer},
+  author        = {Qu, Xingyu and Lu, Siyuan and Chen, Zhiyu and Wang, Sheng and Lin, Tao},
+  year          = {2026},
+  eprint        = {2609.00891},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.AI},
+  doi           = {10.48550/arXiv.2609.00891},
+  url           = {https://arxiv.org/abs/2609.00891}
+}
+```
