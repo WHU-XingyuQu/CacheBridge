@@ -1,0 +1,3 @@
+# Qwen3 complete fitting recipe. Install the appropriate CPU/CUDA torch wheel first.
+torch==2.7.1
+transformers==4.54.1

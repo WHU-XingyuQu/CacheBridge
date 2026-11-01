@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cachebridge"
+version = "0.1.0rc4"
+description = "Cross-model KV cache reuse with trajectory fitting and agent handoff interfaces"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["torch>=2.7,<3", "safetensors>=0.5,<1"]
+
+[project.urls]
+Repository = "https://github.com/WHU-XingyuQu/CacheBridge"
+Documentation = "https://github.com/WHU-XingyuQu/CacheBridge#documentation"
+Issues = "https://github.com/WHU-XingyuQu/CacheBridge/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "build>=1,<2"]
+fitting = ["transformers==4.54.1", "accelerate>=1,<2"]
+architectures = ["transformers==5.15.0"]
+serving = ["psutil>=5.9,<8", "pydantic>=2,<3", "numpy>=1.26,<3"]
+benchmark = ["transformers==4.54.1", "pydantic>=2,<3", "numpy>=1.26,<3"]
+
+[project.scripts]
+cachebridge = "cachebridge.cli:main"
+cachebridge-fit = "cachebridge.offline.cli:main"
+cachebridge-verify = "cachebridge.artifacts:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.package-data]
+"cachebridge.backends.sglang" = ["resources/*.json", "resources/*.patch", "resources/*.txt", "resources/*.md"]

@@ -1,0 +1,200 @@
+diff --git a/python/pyproject.toml b/python/pyproject.toml
+index 00f5616..aee568b 100644
+--- a/python/pyproject.toml
++++ b/python/pyproject.toml
+@@ -58,7 +58,7 @@ srt = [
+     "torch==2.7.1",
+     "torchaudio==2.7.1",
+     "torchvision==0.22.1",
+-    "cuda-python",
++    "cuda-python<13",
+     "einops",
+     "flashinfer_python==0.2.9rc2",
+ ]
+@@ -69,7 +69,7 @@ blackwell = [
+     "torch==2.7.1",
+     "torchaudio==2.7.1",
+     "torchvision==0.22.1",
+-    "cuda-python",
++    "cuda-python<13",
+     "einops",
+     "flashinfer_python==0.2.9rc2",
+     "tiktoken",
+diff --git a/python/sglang/srt/managers/cache_controller.py b/python/sglang/srt/managers/cache_controller.py
+index 3087e81..471ad58 100644
+--- a/python/sglang/srt/managers/cache_controller.py
++++ b/python/sglang/srt/managers/cache_controller.py
+@@ -13,8 +13,11 @@ See the License for the specific language governing permissions and
+ limitations under the License.
+ """
+ 
++import importlib
++import json
+ import logging
+ import math
++import os
+ import threading
+ from queue import Empty, Full, PriorityQueue, Queue
+ from typing import TYPE_CHECKING, List, Optional
+@@ -242,6 +245,18 @@ class HiCacheController:
+             if storage_backend == "file":
+                 self.storage_backend = HiCacheFile()
+                 self.get_hash_str = get_hash_str
++            elif storage_backend == "dynamic":
++                config_path = os.environ.get("SGLANG_HICACHE_DYNAMIC_CONFIG")
++                if not config_path:
++                    raise ValueError(
++                        "SGLANG_HICACHE_DYNAMIC_CONFIG must point to a JSON config"
++                    )
++                with open(config_path) as config_file:
++                    dynamic_config = json.load(config_file)
++                module = importlib.import_module(dynamic_config["module_path"])
++                storage_class = getattr(module, dynamic_config["class_name"])
++                self.storage_backend = storage_class(dynamic_config)
++                self.get_hash_str = get_hash_str
+             elif storage_backend == "nixl":
+                 from sglang.srt.mem_cache.nixl.hicache_nixl import HiCacheNixl
+ 
+@@ -688,7 +703,15 @@ class HiCacheController:
+                 )
+                 for j in range(i, i + len(page_hashes))
+             ]
+-            success = self.storage_backend.batch_set(page_hashes, page_data)
++            if hasattr(self.storage_backend, "batch_set_chained"):
++                prior_hash = (
++                    operation.last_hash if i == 0 else operation.hash_value[i - 1]
++                )
++                success = self.storage_backend.batch_set_chained(
++                    page_hashes, page_data, prior_hash=prior_hash
++                )
++            else:
++                success = self.storage_backend.batch_set(page_hashes, page_data)
+             if not success:
+                 logger.warning(f"Failed to write page {page_hashes} to storage.")
+                 break
+diff --git a/python/sglang/srt/managers/scheduler.py b/python/sglang/srt/managers/scheduler.py
+index 5f9b7f2..3fa55c6 100644
+--- a/python/sglang/srt/managers/scheduler.py
++++ b/python/sglang/srt/managers/scheduler.py
+@@ -1562,7 +1562,9 @@ class Scheduler(
+                     break
+ 
+             if self.enable_hicache_storage:
+-                self.tree_cache.check_prefetch_progress(req.rid)
++                prefetch_done = self.tree_cache.check_prefetch_progress(req.rid)
++                if not prefetch_done:
++                    continue
+ 
+             req.init_next_round_input(self.tree_cache)
+             res = adder.add_one_req(req, has_chunked_req=(self.chunked_req is not None))
+@@ -2284,7 +2286,7 @@ class Scheduler(
+     def handle_rpc_request(self, recv_req: RpcReqInput):
+         # Handle RPC requests
+         logger.info(
+-            f"handle_rpc_request: {recv_req.method}, param: {recv_req.parameters}"
++            "handle_rpc_request: %s, param: %s", recv_req.method, recv_req.parameters
+         )
+ 
+         success = True
+@@ -2541,6 +2543,11 @@ def run_scheduler_process(
+             dp_rank,
+             dp_balance_meta=balance_meta,
+         )
++        # Opt-in, single-request serving KV handoff audit; absent in normal runs.
++        if os.environ.get("CACHEBRIDGE_SERVING_HANDOFF_AUDIT") == "1":
++            from cachebridge.backends.sglang.runtime.serving_handoff_adapter import attach
++
++            attach(scheduler)
+         pipe_writer.send(
+             {
+                 "status": "ready",
+diff --git a/python/sglang/srt/mem_cache/hiradix_cache.py b/python/sglang/srt/mem_cache/hiradix_cache.py
+index 7b26fa8..7562ea7 100644
+--- a/python/sglang/srt/mem_cache/hiradix_cache.py
++++ b/python/sglang/srt/mem_cache/hiradix_cache.py
+@@ -69,8 +69,10 @@ class HiRadixCache(RadixCache):
+         self.tp_group = tp_cache_group
+         self.tp_world_size = torch.distributed.get_world_size(group=self.tp_group)
+         self.enable_storage = hicache_storage_backend is not None
+-        # todo: customizable storage prefetch threshold
+-        self.prefetch_threshold = 256
++        self.wait_storage_prefetch = hicache_storage_backend == "dynamic"
++        # Cross-model experiments need a one-page transfer gate; the storage
++        # backend still validates every page before reporting a hit.
++        self.prefetch_threshold = page_size
+ 
+         self.load_cache_event = threading.Event()
+         self.cache_controller = HiCacheController(
+@@ -184,8 +186,18 @@ class HiRadixCache(RadixCache):
+             )
+         for _ in range(queue_size.item()):
+             ack_id = self.cache_controller.ack_write_queue.get()
+-            self.dec_lock_ref(self.ongoing_write_through[ack_id])
++            node = self.ongoing_write_through[ack_id]
++            self.dec_lock_ref(node)
+             del self.ongoing_write_through[ack_id]
++            if (
++                self.enable_storage
++                and self.cache_controller.write_policy == "write_through"
++                and not node.backuped_storage
++            ):
++                # The host page is complete at this acknowledgement. Continue
++                # true write-through to L3 without requiring a second request
++                # to hit the same radix node.
++                self.write_backup_storage(node)
+ 
+     def loading_check(self):
+         while not self.cache_controller.ack_load_queue.empty():
+@@ -422,7 +434,7 @@ class HiRadixCache(RadixCache):
+     def check_prefetch_progress(self, req_id: str):
+         if req_id not in self.ongoing_prefetch:
+             # there is no ongoing prefetch for this request or it has been revoked
+-            return
++            return True
+ 
+         # todo: more policies for prefetch progress such as timeout
+         # the current policy is to prefetch with best effort and terminate when queuing is over
+@@ -430,6 +442,22 @@ class HiRadixCache(RadixCache):
+             req_id
+         ]
+ 
++        if self.wait_storage_prefetch:
++            prefetch_complete = len(operation.hash_value) > 0 and (
++                operation.completed_tokens
++                == len(operation.hash_value) * self.page_size
++            )
++            if self.tp_world_size > 1:
++                complete_tensor = torch.tensor(prefetch_complete, dtype=torch.int)
++                torch.distributed.all_reduce(
++                    complete_tensor,
++                    op=torch.distributed.ReduceOp.MIN,
++                    group=self.tp_group,
++                )
++                prefetch_complete = bool(complete_tensor.item())
++            if not prefetch_complete:
++                return False
++
+         completed_tokens, hash_value = self.cache_controller.terminate_prefetch(
+             operation
+         )
+@@ -464,6 +492,7 @@ class HiRadixCache(RadixCache):
+         )
+         last_host_node.release_host()
+         del self.ongoing_prefetch[req_id]
++        return True
+ 
+     def match_prefix(self, key: List[int], **kwargs):
+         empty_value = torch.empty((0,), dtype=torch.int64, device=self.device)
+diff --git a/python/sglang/srt/server_args.py b/python/sglang/srt/server_args.py
+index 4691b3c..2e46bcb 100644
+--- a/python/sglang/srt/server_args.py
++++ b/python/sglang/srt/server_args.py
+@@ -1523,7 +1523,7 @@ class ServerArgs:
+         parser.add_argument(
+             "--hicache-storage-backend",
+             type=str,
+-            choices=["file", "mooncake", "hf3fs", "nixl"],
++            choices=["file", "mooncake", "hf3fs", "nixl", "dynamic"],
+             default=ServerArgs.hicache_storage_backend,
+             help="The storage backend for hierarchical KV cache.",
+         )

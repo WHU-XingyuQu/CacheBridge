@@ -1,0 +1,11 @@
+{
+  "source_model": "/path/to/Qwen3-14B",
+  "target_model": "/path/to/Qwen3-32B",
+  "mapper_descriptor": "/path/to/mapper/mapper.json",
+  "tensor_parallel_size": 4,
+  "pool_tokens": 530000,
+  "source_port": 34630,
+  "target_port": 34631,
+  "model_pair": "qwen3_14b_32b",
+  "engine_path": "../.cache/cachebridge/sglang"
+}

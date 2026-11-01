@@ -1,0 +1,3 @@
+# Preserve upstream snapshots and unified-diff context whitespace.
+benchmarks/tau_bench/vendor/** -whitespace
+src/cachebridge/backends/sglang/resources/*.patch -whitespace
