@@ -57,9 +57,6 @@ The paper presents four components:
   <a href="assets/figures/online_system.pdf"><img src="assets/figures/online_system.png" alt="Paper Section 5: source-side reconstruction, concurrent pipelined transfer and online serving policy" width="100%"></a>
 </p>
 
-The figures are from the paper's mapper fitting and system design sections.
-Click either figure to open its original PDF.
-
 Offline fitting combines compact head assignment and initial ridge fitting with
 layer-ordered attention-readout calibration. Online serving combines source-side
 reconstruction, concurrent pipelined transfer and an online serving policy.
