@@ -18,7 +18,7 @@
   <a href="docs/fitting.md">Fitting</a> ·
   <a href="docs/serving.md">Serving</a> ·
   <a href="docs/extending.md">Extend CacheBridge</a> ·
-  <a href="docs/agent_fitting_zh.md">中文指南</a>
+  <a href="docs/agent_development.md">Agent Guide</a>
 </p>
 
 CacheBridge maps a source model's KV cache into a target model's cache space,
@@ -198,7 +198,7 @@ cachebridge serve --config recipes/runtime.local.json -- \
 
 Add `--native` to `evaluate` for target re-prefill under the same router.
 Use `benchmarks/tau_bench/compare.py` for paired evaluation with official tool
-and reward replay. See the [agent development guide](docs/agent_fitting_zh.md).
+and reward replay. See the [agent development guide](docs/agent_development.md).
 
 ## Repository layout
 
@@ -233,7 +233,7 @@ docs/                 # Design, usage and extension guides
 | [Trajectory API](docs/agent_trajectories.md) | Agent integration and exact-token records |
 | [Mapper artifacts](docs/artifacts.md) | Descriptor, tensor geometry and integrity checks |
 | [Extension guide](docs/extending.md) | Add a model pair, agent workload or backend |
-| [Agent 开发指南](docs/agent_fitting_zh.md) | 轨迹采样、拟合与评测流程 |
+| [Agent development guide](docs/agent_development.md) | Trajectory sampling, fitting and evaluation |
 
 ## Development
 
