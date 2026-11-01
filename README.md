@@ -32,7 +32,7 @@ and model routing.
 - **Bounded online transfer.** Source-side block conversion, double buffering,
   GPU peer delivery, direct target-cache installation and all-rank publication.
 - **Composable agent interfaces.** Separate environment, router and backend
-  protocols, exact-token trajectory sampling and a τ-bench workload adapter.
+  protocols, exact-token trajectory sampling and an agentic workload adaptor.
 
 ## How it works
 
