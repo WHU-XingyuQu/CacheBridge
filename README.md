@@ -5,12 +5,14 @@
 </p>
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2609.00891"><img src="https://img.shields.io/badge/arXiv-2609.00891-b31b1b" alt="arXiv: 2609.00891"></a>
   <a href="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml"><img src="https://github.com/WHU-XingyuQu/CacheBridge/actions/workflows/cpu.yml/badge.svg" alt="CPU tests"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="requirements/fitting.txt"><img src="https://img.shields.io/badge/PyTorch-2.7.1-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch 2.7.1"></a>
 </p>
 
 <p align="center">
+  <a href="https://arxiv.org/abs/2609.00891">Paper</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="docs/paper_pipeline.md">Pipeline</a> ·
   <a href="docs/fitting.md">Fitting</a> ·
