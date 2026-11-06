@@ -1,4 +1,6 @@
-<h1 align="center">CacheBridge</h1>
+<p align="center">
+  <img src="assets/branding/cachebridge-logo.png" alt="CacheBridge" width="640">
+</p>
 
 <p align="center">
   <strong>Efficient Cross-Model KV Transfer for Multi-Model LLM Serving</strong>
